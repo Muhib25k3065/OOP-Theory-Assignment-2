@@ -1,0 +1,1077 @@
+import java.util.*;
+import java.util.function.Predicate;
+
+//  INTERFACES (Requirement 4)
+
+// Interface 1: Taxable – implemented by Vehicle subclasses
+// Represents any entity on which tax can be calculated
+interface Taxable {
+    double calculateTax();
+    double getTaxRate();
+}
+
+// Interface 2: Discountable – applied to vehicles that support price discounts
+interface Discountable {
+    double applyDiscount(double rate);
+    double getDiscountedPrice();
+}
+
+// Interface 3: Searchable – anything that can be matched against a query string
+interface Searchable {
+    boolean matches(String query);
+}
+
+// Interface 4: Rateable – users and sellers can be rated (1-5 stars)
+interface Rateable {
+    void rate(int stars);
+    double getAverageRating();
+}
+
+//  ABSTRACT CLASS 1: User (Requirement 3)
+//  Base for Buyer, Seller, Admin
+
+abstract class User implements Rateable {
+    protected int    userId;
+    protected String name;
+    protected String email;
+    protected String phone;
+    protected String city;
+
+    public static int totalUsers = 0;
+
+    private int[] ratings     = new int[200];
+    private int   ratingCount = 0;
+
+    public User(int userId, String name, String email, String phone, String city) {
+        this.userId = userId;
+        this.name   = name;
+        this.email  = email;
+        this.phone  = phone;
+        this.city   = city;
+        totalUsers++;
+    }
+
+    public abstract String getRole();
+    public abstract void   displayDetails();
+
+    public void displayUser() {
+        System.out.println("[" + getRole() + "] " + name
+                + "  Email: " + email + "  City: " + city);
+    }
+
+    @Override
+    public void rate(int stars) {
+        if (stars >= 1 && stars <= 5 && ratingCount < ratings.length)
+            ratings[ratingCount++] = stars;
+    }
+
+    @Override
+    public double getAverageRating() {
+        if (ratingCount == 0) return 0;
+        int sum = 0;
+        for (int i = 0; i < ratingCount; i++) sum += ratings[i];
+        return (double) sum / ratingCount;
+    }
+
+    public String getName()    { return name;   }
+    public int    getUserId()  { return userId; }
+    public String getEmail()   { return email;  }
+}
+
+//  ENGINE  (Composition component owned by Vehicle)
+
+class Engine {
+    private String  type;
+    private int     horsepower;
+    private double  capacity;
+    private String  fuelType;
+    private boolean turbo;
+
+    public static final String DEFAULT_ENGINE_TYPE = "Standard";
+
+    public Engine(String type, int horsepower, double capacity,
+                  String fuelType, boolean turbo) {
+        this.type        = type;
+        this.horsepower  = horsepower;
+        this.capacity    = capacity;
+        this.fuelType    = fuelType;
+        this.turbo       = turbo;
+    }
+
+    public void displayEngine() {
+        System.out.println("  Engine: " + type + " " + capacity + "L"
+                + "  HP: " + horsepower
+                + "  Fuel: " + fuelType
+                + (turbo ? "  [Turbo]" : ""));
+    }
+
+    public int    getHorsepower() { return horsepower; }
+    public String getFuelType()   { return fuelType;   }
+    public String getType()       { return type;       }
+}
+
+//  ABSTRACT CLASS 2: Vehicle (Requirement 3)
+//  Abstract because we never sell a plain "vehicle" – always a Car or Bike
+//  Implements Taxable, Discountable, Searchable interfaces
+
+abstract class Vehicle implements Taxable, Discountable, Searchable {
+
+    protected String brand;
+    protected String model;
+    protected int    year;
+    protected double price;
+    protected double mileage;
+    protected Engine engine;
+    protected Specification spec;     // MEMBER INNER CLASS instance
+
+    public Vehicle(String brand, String model, int year,
+                   double price, double mileage, Engine engine) {
+        this.brand   = brand;
+        this.model   = model;
+        this.year    = year;
+        this.price   = price;
+        this.mileage = mileage;
+        this.engine  = engine;
+        this.spec    = new Specification("White", "Automatic");
+    }
+
+    public abstract void   displayDetails();
+    public abstract String getVehicleType();
+
+    @Override public double getTaxRate()    { return 0.10; }          // 10 % default
+    @Override public double calculateTax()  { return price * getTaxRate(); }
+
+    private double discountRate = 0;
+
+    @Override
+    public double applyDiscount(double rate) {
+        this.discountRate = rate;
+        return price * (1 - rate);
+    }
+
+    @Override
+    public double getDiscountedPrice() { return price * (1 - discountRate); }
+
+    @Override
+    public boolean matches(String query) {
+        return brand.equalsIgnoreCase(query) || model.equalsIgnoreCase(query);
+    }
+
+    public void   updatePrice(double newPrice) { this.price = newPrice; }
+    public String getBrand()   { return brand;   }
+    public String getModel()   { return model;   }
+    public int    getYear()    { return year;    }
+    public double getPrice()   { return price;   }
+    public double getMileage() { return mileage; }
+
+    //  MEMBER INNER CLASS: Specification (Requirement 6)
+    //  This inner class is a member of Vehicle because each vehicle instance
+    //  owns exactly one Specification; it needs no reason to exist independently
+
+    class Specification {
+        String  color;
+        String  transmission;
+        boolean sunroof;
+        String  condition;
+
+        Specification(String color, String transmission) {
+            this.color        = color;
+            this.transmission = transmission;
+            this.sunroof      = false;
+            this.condition    = "Used";
+        }
+
+        void displaySpec() {
+            System.out.println("  Color: " + color
+                    + "  Transmission: " + transmission
+                    + "  Condition: " + condition);
+        }
+    }
+}
+
+//  ABSTRACT CLASS 3: AbstractFilter (Requirement 3)
+//  Encapsulates search-filter logic, concrete filters extend this
+
+abstract class AbstractFilter {
+    protected String filterName;
+
+    public AbstractFilter(String filterName) { this.filterName = filterName; }
+
+    public abstract boolean applyFilter(Vehicle vehicle);
+    public abstract void    displayFilterCriteria();
+}
+
+//  ABSTRACT CLASS 4: AbstractNotification  (Requirement 3)
+//  Notification mechanism – Email, SMS, System extend this
+
+abstract class AbstractNotification {
+    protected String message;
+    protected Date   timestamp;
+
+    public AbstractNotification(String message) {
+        this.message   = message;
+        this.timestamp = new Date();
+    }
+
+    public abstract void   send();
+    public abstract String getNotificationType();
+
+    public void display() {
+        System.out.println("[" + getNotificationType() + "] " + message);
+    }
+}
+
+//  INHERITANCE HIERARCHY – VEHICLES  (Requirement 1)
+
+// Inheritance 1: Vehicle → Car
+// A Car is a specific type of Vehicle with door count and body style
+
+class Car extends Vehicle {
+    private int    numDoors;
+    private String bodyType;
+
+    public Car(String brand, String model, int year, double price,
+               double mileage, Engine engine, int numDoors, String bodyType) {
+        super(brand, model, year, price, mileage, engine);
+        this.numDoors = numDoors;
+        this.bodyType = bodyType;
+    }
+
+    // Overriding displayDetails() – Polymorphism (Requirement 2)
+    @Override
+    public void displayDetails() {
+        System.out.println("CAR: " + brand + " " + model + " (" + year + ")");
+        System.out.printf ("  Price: PKR %.0f   Mileage: %.0f km%n", price, mileage);
+        System.out.println("  Body: " + bodyType + "   Doors: " + numDoors);
+        engine.displayEngine();
+        spec.displaySpec();
+    }
+
+    @Override public String getVehicleType() { return "Car"; }
+    public String getBodyType() { return bodyType; }
+}
+
+// Inheritance 2: Vehicle → Bike
+// A Bike is a two-wheeler variant of Vehicle
+
+class Bike extends Vehicle {
+    private String  bikeCategory;
+    private boolean hasSidecar;
+
+    public Bike(String brand, String model, int year, double price,
+                double mileage, Engine engine, String bikeCategory) {
+        super(brand, model, year, price, mileage, engine);
+        this.bikeCategory = bikeCategory;
+        this.hasSidecar   = false;
+    }
+
+    @Override
+    public void displayDetails() {
+        System.out.println("BIKE: " + brand + " " + model + " (" + year + ")");
+        System.out.printf ("  Price: PKR %.0f   Mileage: %.0f km%n", price, mileage);
+        System.out.println("  Category: " + bikeCategory);
+        engine.displayEngine();
+    }
+
+    @Override public String getVehicleType()  { return "Bike"; }
+    @Override public double getTaxRate()       { return 0.05;  } // Bikes taxed at 5%
+    public String getBikeCategory()            { return bikeCategory; }
+}
+
+// Inheritance 3: Car → ElectricCar  (Multilevel)
+// Extends Car with EV-specific attributes
+
+class ElectricCar extends Car {
+    private double batteryCapacity; // kWh
+    private int    range;           // km per full charge
+    private String chargerType;
+
+    public ElectricCar(String brand, String model, int year, double price,
+                       double mileage, Engine engine, int numDoors,
+                       double batteryCapacity, int range) {
+        super(brand, model, year, price, mileage, engine, numDoors, "Electric");
+        this.batteryCapacity = batteryCapacity;
+        this.range           = range;
+        this.chargerType     = "Type-2";
+    }
+
+    @Override
+    public void displayDetails() {
+        super.displayDetails();
+        System.out.println("  Battery: " + batteryCapacity + " kWh"
+                + "   Range: " + range + " km"
+                + "   Charger: " + chargerType);
+    }
+
+    @Override public String getVehicleType() { return "Electric Car"; }
+    @Override public double getTaxRate()      { return 0.05; } // EV incentive
+
+    // Overriding calculateTax() to add an incentive message
+    @Override
+    public double calculateTax() {
+        System.out.println("  (EV Green Tax Incentive Applied)");
+        return price * getTaxRate();
+    }
+}
+
+// Inheritance 4: Car → LuxuryCar  (Multilevel)
+
+class LuxuryCar extends Car {
+    private boolean hasDriverAssistance;
+    private String  interiorMaterial;
+
+    public LuxuryCar(String brand, String model, int year, double price,
+                     double mileage, Engine engine, int numDoors, String interiorMaterial) {
+        super(brand, model, year, price, mileage, engine, numDoors, "Luxury Sedan");
+        this.hasDriverAssistance = true;
+        this.interiorMaterial    = interiorMaterial;
+    }
+
+    @Override
+    public void displayDetails() {
+        super.displayDetails();
+        System.out.println("  Interior: " + interiorMaterial
+                + "   Driver Assistance: " + (hasDriverAssistance ? "Yes" : "No"));
+    }
+
+    @Override public String getVehicleType() { return "Luxury Car"; }
+    @Override public double getTaxRate()      { return 0.15; } // Higher tax for luxury
+
+    // Luxury cars cap discount at 5 %
+
+    @Override
+    public double applyDiscount(double rate) {
+        return super.applyDiscount(Math.min(rate, 0.05));
+    }
+}
+
+// Inheritance 5: Bike → SportsBike  (Multilevel)
+
+class SportsBike extends Bike {
+    private int     topSpeedKmh;
+    private boolean hasFairingKit;
+
+    public SportsBike(String brand, String model, int year, double price,
+                      double mileage, Engine engine, int topSpeed) {
+        super(brand, model, year, price, mileage, engine, "Sports");
+        this.topSpeedKmh  = topSpeed;
+        this.hasFairingKit = true;
+    }
+
+    @Override
+    public void displayDetails() {
+        super.displayDetails();
+        System.out.println("  Top Speed: " + topSpeedKmh + " km/h"
+                + "   Fairing Kit: " + (hasFairingKit ? "Yes" : "No"));
+    }
+
+    @Override public String getVehicleType() { return "Sports Bike"; }
+}
+
+// Inheritance 6: Bike → CityBike  (Multilevel)
+
+class CityBike extends Bike {
+    private boolean hasCargoRack;
+    private double  fuelEfficiency; // km/L
+
+    public CityBike(String brand, String model, int year, double price,
+                    double mileage, Engine engine, double fuelEfficiency) {
+        super(brand, model, year, price, mileage, engine, "City");
+        this.fuelEfficiency = fuelEfficiency;
+        this.hasCargoRack   = false;
+    }
+
+    @Override
+    public void displayDetails() {
+        super.displayDetails();
+        System.out.println("  Fuel Efficiency: " + fuelEfficiency + " km/L"
+                + "   Cargo Rack: " + (hasCargoRack ? "Yes" : "No"));
+    }
+
+    @Override public String getVehicleType() { return "City Bike"; }
+}
+
+//  INHERITANCE HIERARCHY – USERS  (Requirement 1)
+
+// Inheritance 7: User → Seller
+
+class Seller extends User {
+    protected boolean verified;
+    protected int     totalSales;
+
+    public Seller(int userId, String name, String email, String phone, String city) {
+        super(userId, name, email, phone, city);
+        this.verified   = false;
+        this.totalSales = 0;
+    }
+
+    @Override public String getRole() { return "Seller"; }
+
+    @Override
+    public void displayDetails() {
+        displayUser();
+        System.out.println("  Verified: " + verified + "   Total Sales: " + totalSales);
+    }
+
+    public Listing createListing(int id, Vehicle vehicle) {
+        return new Listing(id, vehicle, this);
+    }
+
+    public boolean isVerified() { return verified; }
+}
+
+// Inheritance 8: Seller → VerifiedSeller  (Multilevel)
+
+class VerifiedSeller extends Seller {
+    private String verificationId;
+    private int    yearsActive;
+    public static final String VERIFIED_BADGE = "PakWheels Verified"; // constant
+
+    public VerifiedSeller(int userId, String name, String email,
+                          String phone, String city, String verificationId) {
+        super(userId, name, email, phone, city);
+        this.verificationId = verificationId;
+        this.verified       = true;
+        this.yearsActive    = 1;
+    }
+
+    @Override public String getRole() { return "Verified Seller"; }
+
+    @Override
+    public void displayDetails() {
+        super.displayDetails();
+        System.out.println("  Verification ID: " + verificationId
+                + "   Badge: " + VERIFIED_BADGE
+                + "   Years Active: " + yearsActive);
+    }
+
+    public FeaturedListing createFeaturedListing(int id, Vehicle vehicle, int days) {
+        return new FeaturedListing(id, vehicle, this, days);
+    }
+}
+
+// Inheritance 9: User → Buyer
+
+class Buyer extends User {
+    private Listing[] favorites = new Listing[20]; // Array of objects (Req 1 Assignment)
+    private int       favCount  = 0;
+    private double    walletBalance;
+
+    public Buyer(int userId, String name, String email, String phone, String city) {
+        super(userId, name, email, phone, city);
+        this.walletBalance = 0;
+    }
+
+    @Override public String getRole() { return "Buyer"; }
+
+    @Override
+    public void displayDetails() {
+        displayUser();
+        System.out.println("  Saved Listings: " + favCount
+                + "   Wallet: PKR " + walletBalance);
+    }
+
+    public void addFavorite(Listing listing) {
+        if (favCount < 20) {
+            favorites[favCount++] = listing;
+            System.out.println("Saved to favourites: "
+                    + listing.getVehicle().getBrand() + " "
+                    + listing.getVehicle().getModel());
+        }
+    }
+
+    public void viewFavorites() {
+        System.out.println("=== Saved Listings ===");
+        for (int i = 0; i < favCount; i++) favorites[i].displayListing();
+    }
+
+    public void sendMessage(Seller seller, String text) {
+        Message msg = new Message(this, seller, text);
+        msg.displayMessage();
+    }
+
+    public void depositWallet(double amount) { walletBalance += amount; }
+    public double getWalletBalance()          { return walletBalance;    }
+}
+
+// Inheritance 10: Buyer → PremiumBuyer  (Multilevel)
+
+class PremiumBuyer extends Buyer {
+    private String  membershipLevel; // Gold / Platinum
+    private double  cashbackRate;
+    private boolean prioritySupport;
+
+    public PremiumBuyer(int userId, String name, String email,
+                        String phone, String city, String membershipLevel) {
+        super(userId, name, email, phone, city);
+        this.membershipLevel = membershipLevel;
+        this.cashbackRate    = membershipLevel.equals("Platinum") ? 0.03 : 0.02;
+        this.prioritySupport = true;
+    }
+
+    @Override public String getRole() { return "Premium Buyer (" + membershipLevel + ")"; }
+
+    @Override
+    public void displayDetails() {
+        super.displayDetails();
+        System.out.println("  Membership: " + membershipLevel
+                + "   Cashback: " + (cashbackRate * 100) + "%"
+                + "   Priority Support: Yes");
+    }
+
+    public double getCashback(double purchaseAmount) {
+        return purchaseAmount * cashbackRate;
+    }
+}
+
+// Inheritance 11: User → Admin
+
+class Admin extends User {
+    private int adminLevel;
+    public static final String ADMIN_CODE = "ADMIN_2025";
+
+    public Admin(int userId, String name, String email, String phone, String city) {
+        super(userId, name, email, phone, city);
+        this.adminLevel = 1;
+    }
+
+    @Override public String getRole() { return "Admin"; }
+
+    @Override
+    public void displayDetails() {
+        displayUser();
+        System.out.println("  Admin Level: " + adminLevel);
+    }
+
+    public void approveListing(Listing listing) {
+        listing.approveListing();
+        System.out.println("Admin approved Listing #" + listing.getListingID());
+    }
+
+    public void removeListing(Listing listing) {
+        listing.removeListing();
+        System.out.println("Admin removed Listing #" + listing.getListingID());
+    }
+}
+
+//  LISTING CLASSES
+
+class Listing {
+    public static int totalListings = 0;  // static member – counts all listings ever created
+
+    protected int     listingID;
+    protected Vehicle vehicle;   // COMPOSITION – listing owns its vehicle data
+    protected Seller  seller;
+    protected boolean approved;
+
+    public Listing(int listingID, Vehicle vehicle, Seller seller) {
+        this.listingID = listingID;
+        this.vehicle   = vehicle;
+        this.seller    = seller;
+        this.approved  = false;
+        totalListings++;
+    }
+
+    public void approveListing() { approved = true;  }
+    public void removeListing()  { approved = false; }
+
+    public void displayListing() {
+        if (approved) {
+            System.out.println("--- Listing #" + listingID + " ---");
+            vehicle.displayDetails();
+            System.out.println("  Seller: " + seller.getName()
+                    + (seller.isVerified() ? "  [VERIFIED]" : ""));
+        }
+    }
+
+    public Vehicle getVehicle()   { return vehicle;   }
+    public int     getListingID() { return listingID; }
+    public boolean isApproved()   { return approved;  }
+}
+
+// Inheritance 12: Listing → FeaturedListing  (Multilevel)
+
+class FeaturedListing extends Listing {
+    private int    featuredDays;
+    private double featuredPrice;
+    public static final double FEATURED_RATE_PER_DAY = 500.0; // PKR constant
+
+    public FeaturedListing(int listingID, Vehicle vehicle, Seller seller, int days) {
+        super(listingID, vehicle, seller);
+        this.featuredDays  = days;
+        this.featuredPrice = days * FEATURED_RATE_PER_DAY;
+    }
+
+    @Override
+    public void displayListing() {
+        if (approved) {
+            System.out.println("*** FEATURED Listing #" + listingID
+                    + "  (Featured for " + featuredDays + " days) ***");
+            vehicle.displayDetails();
+            System.out.println("  Seller: " + seller.getName()
+                    + (seller.isVerified() ? "  [VERIFIED]" : ""));
+        }
+    }
+
+    public double getFeaturedPrice() { return featuredPrice; }
+}
+
+//  MESSAGE
+
+class Message {
+    private Buyer  sender;
+    private Seller receiver;
+    private String text;
+    private Date   date;
+
+    public Message(Buyer sender, Seller receiver, String text) {
+        this.sender   = sender;
+        this.receiver = receiver;
+        this.text     = text;
+        this.date     = new Date();
+    }
+
+    public void displayMessage() {
+        System.out.println("Message  " + sender.getName()
+                + " --> " + receiver.getName() + ":  " + text);
+    }
+}
+
+//  CONCRETE FILTER SUBCLASSES  (extend AbstractFilter)
+
+class PriceFilter extends AbstractFilter {
+    private double minPrice;
+    private double maxPrice;
+
+    public PriceFilter(double minPrice, double maxPrice) {
+        super("Price Filter");
+        this.minPrice = minPrice;
+        this.maxPrice = maxPrice;
+    }
+
+    @Override
+    public boolean applyFilter(Vehicle v) {
+        return v.getPrice() >= minPrice && v.getPrice() <= maxPrice;
+    }
+
+    @Override
+    public void displayFilterCriteria() {
+        System.out.println("Price Range: PKR " + minPrice + " – PKR " + maxPrice);
+    }
+}
+
+class BrandFilter extends AbstractFilter {
+    private String brand;
+
+    public BrandFilter(String brand) {
+        super("Brand Filter");
+        this.brand = brand;
+    }
+
+    @Override public boolean applyFilter(Vehicle v) { return v.getBrand().equalsIgnoreCase(brand); }
+
+    @Override
+    public void displayFilterCriteria() {
+        System.out.println("Brand: " + brand);
+    }
+}
+
+class YearFilter extends AbstractFilter {
+    private int fromYear;
+    private int toYear;
+
+    public YearFilter(int fromYear, int toYear) {
+        super("Year Filter");
+        this.fromYear = fromYear;
+        this.toYear   = toYear;
+    }
+
+    @Override public boolean applyFilter(Vehicle v) { return v.getYear() >= fromYear && v.getYear() <= toYear; }
+
+    @Override
+    public void displayFilterCriteria() {
+        System.out.println("Year Range: " + fromYear + " – " + toYear);
+    }
+}
+
+//  CONCRETE NOTIFICATION SUBCLASSES
+
+class EmailNotification extends AbstractNotification {
+    private String recipientEmail;
+
+    public EmailNotification(String message, String recipientEmail) {
+        super(message);
+        this.recipientEmail = recipientEmail;
+    }
+
+    @Override public void   send()                { System.out.println("Email -> " + recipientEmail + ": " + message); }
+    @Override public String getNotificationType() { return "Email"; }
+}
+
+class SMSNotification extends AbstractNotification {
+    private String phone;
+
+    public SMSNotification(String message, String phone) {
+        super(message);
+        this.phone = phone;
+    }
+
+    @Override public void   send()                { System.out.println("SMS -> " + phone + ": " + message); }
+    @Override public String getNotificationType() { return "SMS"; }
+}
+
+//  GENERIC CLASS: DataStore<T>  (Requirement 5)
+//  A type-safe, reusable container that works with any object type
+//  Supports add, get, search, swap, and display operations
+
+class DataStore<T> {
+    private Object[] data;
+    private int      size;
+    private int      capacity;
+
+    public DataStore(int capacity) {
+        this.capacity = capacity;
+        this.data     = new Object[capacity];
+        this.size     = 0;
+    }
+
+    public boolean add(T item) {
+        if (size < capacity) { data[size++] = item; return true; }
+        return false;
+    }
+
+    @SuppressWarnings("unchecked")
+    public T get(int index) {
+        return (index >= 0 && index < size) ? (T) data[index] : null;
+    }
+
+    public int getSize() { return size; }
+
+    // Generic method 1: search using a Predicate condition
+
+    @SuppressWarnings("unchecked")
+    public T search(Predicate<T> condition) {
+        for (int i = 0; i < size; i++) {
+            T item = (T) data[i];
+            if (condition.test(item)) return item;
+        }
+        return null;
+    }
+
+    // Generic method 2: swap two elements at given indices
+
+    public void swap(int i, int j) {
+        if (i >= 0 && j >= 0 && i < size && j < size) {
+            Object tmp = data[i];
+            data[i]    = data[j];
+            data[j]    = tmp;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    public void displayAll(String label) {
+        System.out.println("=== " + label + " ===");
+        for (int i = 0; i < size; i++) System.out.println("  " + data[i]);
+    }
+}
+
+//  GENERIC UTILITY METHODS  (Requirement 5)
+
+class GenericUtils {
+
+    // Generic method 3: bubble-sort any Vehicle array by ascending price
+
+    public static <T extends Vehicle> void sortByPrice(T[] arr, int count) {
+        for (int i = 0; i < count - 1; i++)
+            for (int j = 0; j < count - i - 1; j++)
+                if (arr[j].getPrice() > arr[j + 1].getPrice()) {
+                    T tmp    = arr[j];
+                    arr[j]   = arr[j + 1];
+                    arr[j+1] = tmp;
+                }
+    }
+
+    // Generic swap utility
+
+    public static <T> void swap(T[] arr, int i, int j) {
+        T tmp  = arr[i];
+        arr[i] = arr[j];
+        arr[j] = tmp;
+    }
+
+    // Find cheapest vehicle in an array
+
+    public static <T extends Vehicle> T findCheapest(T[] arr, int count) {
+        if (count == 0) return null;
+        T cheapest = arr[0];
+        for (int i = 1; i < count; i++)
+            if (arr[i].getPrice() < cheapest.getPrice()) cheapest = arr[i];
+        return cheapest;
+    }
+}
+
+//  MARKETPLACE  (contains Static Nested Class + Local Inner Class)
+
+class Marketplace {
+    public static final int    MAX_LISTINGS  = 100;              // constant
+    public static final String PLATFORM_NAME = "PakWheels Clone"; // constant
+
+    private Listing[] listings     = new Listing[MAX_LISTINGS];
+    private int       listingCount = 0;
+
+    public void addListing(Listing l) {
+        if (listingCount < MAX_LISTINGS) listings[listingCount++] = l;
+    }
+
+    // Polymorphism: Method Overloading (Requirement 2)
+    // 4 overloaded versions of search() with different signatures
+
+    public void search(String brand) {
+        System.out.println("=== Results for Brand: " + brand + " ===");
+        for (int i = 0; i < listingCount; i++)
+            if (listings[i].getVehicle().getBrand().equalsIgnoreCase(brand))
+                listings[i].displayListing();
+    }
+
+    public void search(String brand, double maxPrice) {
+        System.out.println("=== Results: " + brand + " under PKR " + maxPrice + " ===");
+        for (int i = 0; i < listingCount; i++) {
+            Vehicle v = listings[i].getVehicle();
+            if (v.getBrand().equalsIgnoreCase(brand) && v.getPrice() <= maxPrice)
+                listings[i].displayListing();
+        }
+    }
+
+    public void search(String brand, int year) {
+        System.out.println("=== Results: " + brand + " (" + year + ") ===");
+        for (int i = 0; i < listingCount; i++) {
+            Vehicle v = listings[i].getVehicle();
+            if (v.getBrand().equalsIgnoreCase(brand) && v.getYear() == year)
+                listings[i].displayListing();
+        }
+    }
+
+    public void search(double minPrice, double maxPrice) {
+        System.out.println("=== Results: PKR " + minPrice + " – " + maxPrice + " ===");
+        for (int i = 0; i < listingCount; i++) {
+            double p = listings[i].getVehicle().getPrice();
+            if (p >= minPrice && p <= maxPrice)
+                listings[i].displayListing();
+        }
+    }
+
+    public void searchWithFilter(AbstractFilter filter) {
+
+
+        //  LOCAL INNER CLASS: ResultFormatter  (Requirement 6)
+        //  Defined inside this method because it's only used here to format
+        //  filter search output.  It cannot be reused elsewhere by design.
+
+        class ResultFormatter {
+            void printHeader() {
+                System.out.println("================================================");
+                filter.displayFilterCriteria();
+                System.out.println("------------------------------------------------");
+            }
+            void printFooter(int count) {
+                System.out.println("------------------------------------------------");
+                System.out.println("Total matches: " + count);
+                System.out.println("================================================");
+            }
+        }
+
+        ResultFormatter fmt = new ResultFormatter();
+        fmt.printHeader();
+        int count = 0;
+        for (int i = 0; i < listingCount; i++)
+            if (filter.applyFilter(listings[i].getVehicle())) {
+                listings[i].displayListing();
+                count++;
+            }
+        fmt.printFooter(count);
+    }
+
+    public void displayAll() {
+        System.out.println("=== All Listings on " + PLATFORM_NAME + " ===");
+        for (int i = 0; i < listingCount; i++) listings[i].displayListing();
+    }
+
+    //  STATIC NESTED CLASS: Statistics  (Requirement 6)
+    //  Does not need a Marketplace instance – it reads class-level counters.
+    //  Making it static avoids an unnecessary outer reference.
+
+    static class Statistics {
+        public static int  getTotalUsers()    { return User.totalUsers;    }
+        public static int  getTotalListings() { return Listing.totalListings; }
+
+        public static void display() {
+            System.out.println("=== Marketplace Statistics ===");
+            System.out.println("  Total Users:    " + getTotalUsers());
+            System.out.println("  Total Listings: " + getTotalListings());
+        }
+    }
+}
+
+//  MAIN CLASS
+
+public class Main {
+
+    // Constants (Requirement from Assignment 1 carried forward)
+    public static final String COMPANY_NAME = "PakWheels Clone";
+    public static final double TAX_RATE     = 0.10;
+    public static final int    MAX_LISTINGS = 100;
+    public static final String COUNTRY      = "Pakistan";
+    public static final String CURRENCY     = "PKR";
+
+    public static void main(String[] args) {
+
+        System.out.println("======  Welcome to " + COMPANY_NAME + "  ======\n");
+
+        //  ANONYMOUS INNER CLASS  (Requirement 6)
+        //  We need a one-off system-start notification with custom behavior.
+        //  Creating a full named class just for this would be overkill, so we
+        //  use an anonymous subclass of AbstractNotification inline.
+
+        AbstractNotification systemAlert = new AbstractNotification("System started successfully!") {
+            @Override
+            public void send() {
+                System.out.println("[SYSTEM ALERT] " + message
+                        + "  |  " + COMPANY_NAME + " is now live in " + COUNTRY);
+            }
+            @Override
+            public String getNotificationType() { return "System"; }
+        };
+        systemAlert.send();
+        System.out.println();
+
+        // ---- Create Engines ----
+        Engine vvtiEngine    = new Engine("VVTi",           180, 1.8, "Petrol",   false);
+        Engine dieselEngine  = new Engine("Common Rail",    220, 2.0, "Diesel",   true);
+        Engine bikeEngine    = new Engine("Single-Cyl",      8,  0.07,"Petrol",   false);
+        Engine electricMotor = new Engine("Electric Motor", 350, 0.0, "Electric", false);
+        Engine sportEngine   = new Engine("Inline-4",       100, 1.0, "Petrol",   true);
+
+        // ---- Create Vehicles (demonstrates inheritance hierarchy) ----
+        Car        corolla = new Car(       "Toyota", "Corolla",  2020,  4500000, 25000, vvtiEngine,    4, "Sedan");
+        Car        civic   = new Car(       "Honda",  "Civic",    2022,  5200000, 10000, vvtiEngine,    4, "Sedan");
+        ElectricCar tesla  = new ElectricCar("Tesla","Model 3",   2023, 12000000,  5000, electricMotor, 4, 75.0, 570);
+        LuxuryCar  bmw     = new LuxuryCar( "BMW",   "7 Series", 2022, 25000000,  8000, dieselEngine,  4, "Nappa Leather");
+        SportsBike yamaha  = new SportsBike("Yamaha","R1",        2021,  2000000,  3000, sportEngine,   299);
+        CityBike   honda70 = new CityBike(  "Honda", "CD70",      2023,   180000,  1000, bikeEngine,    65.0);
+
+        // ---- Polymorphism Demo: displayDetails() overridden in each subclass ----
+        System.out.println("=== POLYMORPHISM – displayDetails() ===");
+        Vehicle[] allVehicles = { corolla, civic, tesla, bmw, yamaha, honda70 };
+        for (Vehicle v : allVehicles) {
+            v.displayDetails();   // runtime dispatch to the correct override
+            System.out.println();
+        }
+
+        // ---- Interfaces – Taxable ----
+        System.out.println("=== INTERFACES – calculateTax() via Taxable ===");
+        for (Vehicle v : allVehicles) {
+            System.out.printf("%-12s %-10s  Tax Rate: %4.0f%%   Tax: PKR %.0f%n",
+                    v.getBrand(), v.getModel(), v.getTaxRate() * 100, v.calculateTax());
+        }
+        System.out.println();
+
+        // ---- Interfaces – Discountable ----
+        System.out.println("=== INTERFACES – applyDiscount() via Discountable ===");
+        System.out.printf("Corolla after 10%% discount: PKR %.0f%n", corolla.applyDiscount(0.10));
+        System.out.printf("BMW after 10%% discount (capped 5%%): PKR %.0f%n", bmw.applyDiscount(0.10));
+        System.out.println();
+
+        // ---- Create Users ----
+        VerifiedSeller aliKhan  = new VerifiedSeller(1, "Ali Khan",  "ali@pw.com",   "0300-1234567", "Karachi",   "VS-2025-001");
+        Seller         asad     = new Seller(         2, "Asad Iqbal","asad@mail.com","0321-7654321", "Lahore");
+        PremiumBuyer   ahmed    = new PremiumBuyer(   3, "Ahmed Raza","ahmed@mail.com","0311-1112222","Islamabad", "Platinum");
+        Buyer          sara     = new Buyer(           4, "Sara Malik","sara@mail.com","0333-9876543", "Lahore");
+        Admin          admin    = new Admin(           5, "Admin",     "admin@pw.com", "0000-0000000", "Islamabad");
+
+        // ---- Create Listings ----
+        Listing        l1  = aliKhan.createListing(101, corolla);
+        Listing        l2  = asad.createListing(   102, civic);
+        FeaturedListing l3 = aliKhan.createFeaturedListing(103, bmw, 7);
+        Listing        l4  = asad.createListing(   104, yamaha);
+        Listing        l5  = aliKhan.createListing( 105, honda70);
+        Listing        l6  = aliKhan.createListing( 106, tesla);
+
+        Marketplace mp = new Marketplace();
+        for (Listing l : new Listing[]{l1, l2, l3, l4, l5, l6}) mp.addListing(l);
+
+        // Admin approves all listings
+        admin.approveListing(l1); admin.approveListing(l2); admin.approveListing(l3);
+        admin.approveListing(l4); admin.approveListing(l5); admin.approveListing(l6);
+        System.out.println();
+
+        // ---- Overloaded search methods ----
+        System.out.println("=== OVERLOADED SEARCH – brand only ===");
+        mp.search("Honda");
+
+        System.out.println("\n=== OVERLOADED SEARCH – brand + maxPrice ===");
+        mp.search("Honda", 300000.0);
+
+        System.out.println("\n=== OVERLOADED SEARCH – brand + year ===");
+        mp.search("BMW", 2022);
+
+        System.out.println("\n=== OVERLOADED SEARCH – price range ===");
+        mp.search(100000, 600000);
+
+        // ---- AbstractFilter search (uses local inner class) ----
+        System.out.println("\n=== FILTER SEARCH – PriceFilter (500k–6M PKR) ===");
+        mp.searchWithFilter(new PriceFilter(500000, 6000000));
+
+        System.out.println("\n=== FILTER SEARCH – YearFilter (2021–2023) ===");
+        mp.searchWithFilter(new YearFilter(2021, 2023));
+
+        // ---- Buyer interactions ----
+        ahmed.addFavorite(l1);
+        ahmed.addFavorite(l3);
+        ahmed.sendMessage(aliKhan, "Is the BMW still negotiable?");
+        sara.sendMessage(asad, "Can I test drive the Civic?");
+        System.out.println();
+
+        // ---- Generics – sorting & cheapest ----
+        System.out.println("=== GENERICS – sortByPrice() ===");
+        Car[] cars = { corolla, civic, bmw };
+        GenericUtils.sortByPrice(cars, 3);
+        for (Car c : cars)
+            System.out.printf("  %-7s %-10s  PKR %.0f%n", c.getBrand(), c.getModel(), c.getPrice());
+
+        Car cheapest = GenericUtils.findCheapest(cars, 3);
+        System.out.println("Cheapest car: " + cheapest.getBrand() + " " + cheapest.getModel());
+
+        System.out.println("\n=== GENERICS – DataStore<Listing> ===");
+        DataStore<Listing> store = new DataStore<>(10);
+        store.add(l1); store.add(l2); store.add(l3);
+        Listing found = store.search(lst -> lst.getVehicle().getBrand().equalsIgnoreCase("Toyota"));
+        if (found != null)
+            System.out.println("Found in store: " + found.getVehicle().getBrand()
+                    + " " + found.getVehicle().getModel());
+        store.swap(0, 2);
+        System.out.println("After swap(0,2) – item 0 is now: "
+                + store.get(0).getVehicle().getBrand() + " "
+                + store.get(0).getVehicle().getModel());
+
+        // ---- Notifications (EmailNotification & SMSNotification) ----
+        System.out.println("\n=== NOTIFICATIONS (Concrete AbstractNotification subclasses) ===");
+        new EmailNotification("Your listing has been approved!", aliKhan.getEmail()).send();
+        new SMSNotification("Listing approved – PakWheels Clone", "0300-1234567").send();
+
+        // ---- Rateable interface ----
+        System.out.println("\n=== INTERFACES – Rateable ===");
+        aliKhan.rate(5); aliKhan.rate(4); aliKhan.rate(5);
+        System.out.printf("Ali Khan average rating: %.1f/5%n", aliKhan.getAverageRating());
+
+        // ---- Static nested class ----
+        System.out.println();
+        Marketplace.Statistics.display();
+
+        // ---- Polymorphism on User hierarchy ----
+        System.out.println("\n=== USER HIERARCHY – displayDetails() overrides ===");
+        User[] users = { aliKhan, asad, ahmed, sara, admin };
+        for (User u : users) { u.displayDetails(); System.out.println(); }
+
+        System.out.println("======  System Shutdown  ======");
+    }
+}
